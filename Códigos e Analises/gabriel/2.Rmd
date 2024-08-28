@@ -1,0 +1,415 @@
+---
+title: "Analise alarmes"
+output: html_document
+date: "2023-03-14"
+---
+
+```{r}
+library(miscTools) #rSquared
+library(readxl)
+df <- read_excel("G:/Drives compartilhados/Qualidade/PROJETOS CIENTÍFICOS/Trabalho alarme/gabriel/ALARMES.xlsx", 
+    sheet = "Planilha1")
+View(df)
+```
+
+```{r}
+df$CAP = factor(df$CAP, label = c("P1","P2"), levels = c(1,2))
+```
+
+```{r}
+names(df)
+```
+#### LIMPEZA DE DADOS
+```{r}
+#arrumando inconsistencias
+df$IDADE[df$IDADE == "08 MESES"] = 8/12
+df$IDADE = as.numeric(df$IDADE)
+df$ASA = as.numeric(df$ASA)
+```
+
+
+#### TABELA 1
+```{r}
+VARIAVEIS = c("IDADE","GÊNERO","ASA")
+tabela = CreateTableOne(data = df,  strata="CAP",vars = VARIAVEIS)
+
+shapiro.test(df$IDADE[df$CAP == "P1"])
+shapiro.test(df$IDADE[df$CAP == "P2"])
+#os dados de idade não são normais
+
+print(tabela, showAllLevels = TRUE, nonnormal = VARIAVEIS)
+
+mean(df$IDADE[df$CAP == "P1"], na.rm=T)
+sd(df$IDADE[df$CAP == "P1"], na.rm=T)
+mean(df$IDADE[df$CAP == "P2"], na.rm=T)
+sd(df$IDADE[df$CAP == "P2"], na.rm=T)
+wilcox.test(IDADE~CAP, data=df)
+t.test(IDADE~CAP, data=df)
+
+conti("GÊNERO","CAP")
+chisq.test(df$GÊNERO, df$CAP)
+conti("ASA","CAP")
+chisq.test(df$ASA, df$CAP)
+```
+
+
+
+#### GRAFICO DE COMORBIDADES
+```{r}
+df_comorbidades = df[c("CAP", "COMORBIDADE")]
+
+for (i in 1:nrow(df_comorbidades)){
+  if (as.integer(df_comorbidades$COMORBIDADE[i]) > 10){
+    #print(df_comorbidades$COMORBIDADE[i])
+    #retornando o ultimo numero em mais uma linha
+    df_comorbidades = rbind(df_comorbidades, data.frame(CAP = df_comorbidades$CAP[i], COMORBIDADE = substr(df_comorbidades$COMORBIDADE[i], 2, 2)))
+    
+    #retornando o primeiro numero
+    df_comorbidades$COMORBIDADE[i] = substr(df_comorbidades$COMORBIDADE[i], 1, 1)
+  }
+}
+
+nrow(df_comorbidades)
+```
+```{r}
+#levels(as.factor(df_comorbidades$COMORBIDADE))
+table(df_comorbidades$COMORBIDADE)
+272 - 154
+
+df_comorbidades = df_comorbidades %>% filter(COMORBIDADE != "0")
+nrow(df_comorbidades)
+```
+
+```{r}
+df_comorbidades$COMORBIDADE = factor(df_comorbidades$COMORBIDADE, 
+                                     label = c("1 - COPD","2 - Smoking","3 - Hypertension","4 - Physiological \nbradycardia",
+                                               "5 - Arrhythmias","6 - Diabetes Mellitus","7- Other"), 
+                                     levels = c("1","2","3","4","5","6","7"))
+
+tabela = df_comorbidades %>% group_by(CAP, COMORBIDADE) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+tabela
+
+ggplot(tabela, aes(as.factor(COMORBIDADE), Freq, label=Freq, fill=as.factor(COMORBIDADE))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(CAP~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="", title ='Comorbidities',
+       subtitle = paste0("p-value (qui-square) = ", 
+                         retorne_p(chisq.test(df_comorbidades$CAP, df_comorbidades$COMORBIDADE)$p.value))) +
+  scale_fill_brewer(palette = "Spectral")
+
+ggsave("comorbidades.png", height=15, width=22, units="cm", dpi= 600)
+```
+
+
+#### SUPPLEMENTARY FIGURE 2
+```{r}
+ggplot() + 
+  geom_point(data = df %>% filter(`C SIS` > 0), aes(y=`C SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C SIS` > 0), aes(y=`C SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.9) +
+  geom_point(data = df %>% filter(`C DIS` > 0), aes(y=`C DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C DIS` > 0), aes(y=`C DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`C SO` > 0), aes(y=`C SO`, x="SP02", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C SO` > 0), aes(y=`C SO`, x="SP02", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`C FC` > 0), aes(y=`C FC`, x="HR", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C FC` > 0), aes(y=`C FC`, x="HR", fill=as.factor(CAP)), alpha=0.9, show.legend = F) + 
+  scale_y_continuous(breaks=seq(from = 1, to = 12, by = 1)) + labs(y='Consistent Alarms (n)', x="", fill="") + 
+  theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+        legend.position = "bottom", axis.line = element_line(colour = "black")) + scale_fill_manual(values=c("#023e8a","#8d99ae"), labels = c("P1","P2")) +
+  theme_bw() + theme(legend.position="bottom")
+  
+#geom_boxjitter
+  
+ggsave("Consistent alarmes.png", height=10, width=20, units="cm", dpi= 600)
+```
+```{r}
+capture_p(wilcox.test(`C SIS`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`C SIS`~CAP, data=df %>% filter(`C SIS` > 0))$p.value)
+
+capture_p(wilcox.test(`C DIS`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`C DIS`~CAP, data=df %>% filter(`C DIS` > 0))$p.value)
+
+capture_p(wilcox.test(`C SO`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`C SO`~CAP, data=df %>% filter(`C SO` > 0))$p.value)
+
+capture_p(wilcox.test(`C FC`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`C FC`~CAP, data=df %>% filter(`C FC` > 0))$p.value)
+```
+```{r}
+capture_p(wilcox.test(`N SIS`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`N SIS`~CAP, data=df %>% filter(`C SIS` > 0))$p.value)
+
+capture_p(wilcox.test(`N DIS`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`N DIS`~CAP, data=df %>% filter(`C DIS` > 0))$p.value)
+
+capture_p(wilcox.test(`N SO`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`N SO`~CAP, data=df %>% filter(`C SO` > 0))$p.value)
+
+capture_p(wilcox.test(`N FC`~CAP, data=df)$p.value)
+capture_p(wilcox.test(`N FC`~CAP, data=df %>% filter(`C FC` > 0))$p.value)
+```
+
+```{r}
+ggplot() + 
+  geom_point(data = df %>% filter(`N SIS` > 0), aes(y=`N SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N SIS` > 0), aes(y=`N SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.9) +
+  geom_point(data = df %>% filter(`N DIS` > 0), aes(y=`N DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N DIS` > 0), aes(y=`N DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`N SO` > 0), aes(y=`N SO`, x="SP02", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N SO` > 0), aes(y=`N SO`, x="SP02", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`N FC` > 0), aes(y=`N FC`, x="HR", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N FC` > 0), aes(y=`N FC`, x="HR", fill=as.factor(CAP)), alpha=0.9, show.legend = F) + 
+  scale_y_continuous(breaks=seq(from = 1, to = 12, by = 1)) + labs(y='Inconsistent Alarms (n)', x="", fill="") + 
+  theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+        legend.position = "bottom",axis.line = element_line(colour = "black")) + scale_fill_manual(values=c("#023e8a","#8d99ae"), labels = c("P1","P2")) +
+  theme_bw() + theme(legend.position="bottom")
+  
+
+ggsave("Inconsistent alarmes.png", height=10, width=20, units="cm", dpi= 600)
+```
+```{r}
+
+```
+
+
+#### REGRESSÕES
+Regressão Binaria
+```{r}
+df$alarmes_inconsistente = ifelse(df$`TOTAL INCON` > 0, 1, 0)
+
+df$comorbidade_b = ifelse(df$COMORBIDADE > 0, 1, 0)
+
+table(df$alarmes_inconsistente)
+```
+```{r}
+#analise multivariada
+modelo_logit = glm(alarmes_inconsistente~CAP+ASA+comorbidade_b+IDADE+GÊNERO, binomial(link="logit"), data=df)
+analise_mod(modelo_logit)
+analise_mod(step(modelo_logit, direction = "backward", test = "F"))
+
+PseudoR2(modelo_logit, which = NULL)
+vif(modelo_logit)
+previsoes = ifelse(predict(object = modelo_logit, newdata = df, type = "response") > 0.5, 1, 0)
+table(df$alarmes_inconsistente, previsoes)
+
+#analise univariada
+analise_mod(glm(alarmes_inconsistente~CAP, binomial(link="logit"), data=df))
+analise_mod(glm(alarmes_inconsistente~ASA, binomial(link="logit"), data=df))
+analise_mod(glm(alarmes_inconsistente~comorbidade_b, binomial(link="logit"), data=df))
+analise_mod(glm(alarmes_inconsistente~IDADE, binomial(link="logit"), data=df))
+analise_mod(glm(alarmes_inconsistente~GÊNERO, binomial(link="logit"), data=df))
+```
+```{r}
+hist(df$`TOTAL INCON`)
+```
+Regressão Poisson
+```{r}
+mean(df$`TOTAL INCON`)
+var(df$`TOTAL INCON`)
+
+#analise multivariada
+modelo_poisson = glm(`TOTAL INCON`~CAP+ASA+GÊNERO+comorbidade_b, family="poisson", data=df)
+analise_mod(modelo_poisson)
+analise_mod(step(modelo_poisson, direction = "backward", test = "F"))
+
+#testes
+PseudoR2(modelo_poisson, which = NULL)
+vif(modelo_poisson) #multicolinearidade
+library(AER)
+dispersiontest(modelo_poisson) #super dispersão
+anova(modelo_poisson, test="Chisq") #analise da varianca
+
+plot(df$`TOTAL INCON`, pch="o", col="blue", xlab="Width (grupos)",
+     ylab="Número de satélites")
+points(modelo_poisson$fitted.values, pch="p", col="red")
+legend(6,30,c("obs","pred"), pch=c("o","p"), col=c("blue","red"))
+
+
+#analise univariada
+analise_mod(glm(`TOTAL INCON`~CAP, family="poisson", data=df))
+analise_mod(glm(`TOTAL INCON`~ASA, family="poisson", data=df))
+analise_mod(glm(`TOTAL INCON`~comorbidade_b, family="poisson", data=df))
+analise_mod(glm(`TOTAL INCON`~IDADE, family="poisson", data=df))
+analise_mod(glm(`TOTAL INCON`~GÊNERO, family="poisson", data=df))
+
+previsoes = ifelse(predict(object = model, newdata = df, type = "response") > 0.5, 1, 0)
+table(df$alarmes_inconsistente, previsoes)
+```
+Regressão Binomial Negativa
+```{r}
+summary(glm.nb(`TOTAL INCON`~1, data=df))
+
+#analise multivariada
+modelo_bn = glm.nb(`TOTAL INCON`~CAP+ASA+comorbidade_b+IDADE+GÊNERO, data=df)
+analise_mod(modelo_bn) #taxa de incidencia
+analise_mod(step(modelo_bn, direction = "backward", test = "F"))
+
+PseudoR2(modelo_bn, which = NULL)
+
+#analise univariada
+analise_mod(glm.nb(`TOTAL INCON`~CAP, data=df))
+analise_mod(glm.nb(`TOTAL INCON`~ASA, data=df))
+analise_mod(glm.nb(`TOTAL INCON`~comorbidade_b, data=df))
+analise_mod(glm.nb(`TOTAL INCON`~IDADE, data=df))
+analise_mod(glm.nb(`TOTAL INCON`~GÊNERO, data=df))
+
+m1 = glm.nb(`TOTAL INCON`~CAP, data=df)
+previsoes = predict(m1, df, type = "response")
+mean(abs(df$`TOTAL INCON` - previsoes))
+rSquared(df$`TOTAL INCON`, resid = df$`TOTAL INCON` - previsoes)
+
+plot(df$`TOTAL INCON`, pch="o", col="blue", xlab="Width (grupos)",
+     ylab="Número de satélites")
+points(previsoes, pch="p", col="red")
+legend(6,30,c("obs","pred"), pch=c("o","p"), col=c("blue","red"))
+```
+Regressão Inflado de zero
+```{r}
+library(pscl)
+#CAP+ASA+comorbidade_b+IDADE+GÊNERO
+modelo_zero = zeroinfl(`TOTAL INCON`~ASA, data=df, dist = "poisson")
+summary(modelo_zero)
+
+#count
+summary(modelo_zero)$coefficients$count %>% write_clip(dec = ",", col.names = TRUE)
+summary(modelo_zero)$coefficients$zero %>% write_clip(dec = ",", col.names = TRUE)
+exp(cbind(OR= coef(modelo_zero), confint(modelo_zero))) %>% write_clip(dec = ",", col.names = TRUE)
+```
+Regressão Inflado de Zero
+```{r}
+#CAP+ASA+comorbidade_b+IDADE+GÊNERO
+modelo_zero_nb = zeroinfl(`TOTAL INCON`~CAP+ASA+comorbidade_b+IDADE+GÊNERO, data=df, dist = "negbin")
+summary(modelo_zero_nb)
+
+#count
+summary(modelo_zero_nb)$coefficients$count %>% write_clip(dec = ",", col.names = TRUE)
+summary(modelo_zero_nb)$coefficients$zero %>% write_clip(dec = ",", col.names = TRUE)
+exp(cbind(OR= coef(modelo_zero_nb), confint(modelo_zero_nb))) %>% write_clip(dec = ",", col.names = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### Relações
+```{r}
+#Idade x Numero de alarmes inconscistentes
+ggplot(df, aes(x=`TOTAL INCON`, y=IDADE)) + geom_point() + facet_grid(CAP~.)
+table(df$`TOTAL INCON`, df$CAP)
+
+x[is.na(x)] = mean(x,na.rm=TRUE)
+df$IDADE[is.na(df$IDADE)] = mean(df$IDADE, na.rm=T)
+
+hist(df$IDADE)
+summary(df$IDADE)
+
+df$idade_cat1[df$IDADE <= 20] = "<20"
+df$idade_cat1[df$IDADE > 20 & df$IDADE <= 30] = "21-30"
+df$idade_cat1[df$IDADE > 30 & df$IDADE <= 40] = "31-40"
+df$idade_cat1[df$IDADE > 40 & df$IDADE <= 50] = "41-50"
+df$idade_cat1[df$IDADE > 50 & df$IDADE <= 60] = "51-60"
+df$idade_cat1[df$IDADE > 60] = ">60"
+
+table(df$idade_cat1)
+chisq.test(table(df$idade_cat1, df$alarmes_inconsistente))
+
+tabela = df %>% group_by(alarmes_inconsistente, idade_cat1) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+tabela
+
+ggplot(tabela, aes(as.factor(idade_cat1), Freq, label=Freq, fill=as.factor(idade_cat1))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(alarmes_inconsistente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="", title ='Comorbidities',
+       subtitle = paste0("p-value (qui-square) = ", 
+                         retorne_p(chisq.test(df$alarmes_inconsistente, df$idade_cat1)$p.value))) +
+  scale_fill_brewer(palette = "Spectral")
+
+ggsave("comorbidades.png", height=15, width=22, units="cm", dpi= 600)
+
+```
+
+```{r}
+table(df$`TOTAL INCON`, df$CAP)
+
+medias = df %>% group_by(CAP) %>% summarize(med = mean(`TOTAL INCON`))
+medianas = df %>% group_by(CAP) %>% summarize(med = median(`TOTAL INCON`))
+
+ggplot(df, aes(x=`TOTAL INCON`, fill=as.factor(CAP))) +
+  geom_density(position='identity', alpha =0.5)+
+  labs(y='Probability Density', fill="Categorias:", 
+       subtitle=paste0("P-value: (teste t) = ", retorne_p(t.test(`TOTAL INCON`~CAP, df, var.equal=TRUE)$p.value),
+                       ", (man whitney) = ", retorne_p(wilcox.test(`TOTAL INCON`~CAP, df)$p.value))) +
+  theme_bw() + 
+  theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  #geom_vline(data = medias, aes(xintercept = med, color = as.factor(CAP)), 
+         #    linetype="dashed", size=1) + #color=c("#40BCD8","#1978B3")
+  geom_vline(data = medianas, aes(xintercept = med, color = as.factor(CAP)), 
+             linetype="dashed", size=1) +
+  scale_fill_discrete(labels = c("Não", "Sim")) + 
+  scale_x_continuous(breaks=seq(from = min(df$`TOTAL INCON`), 
+                              to = max(df$`TOTAL INCON`), 
+                              by = (max(df$`TOTAL INCON`) - min(df$`TOTAL INCON`))/5))
+#scale_fill_manual(values=c("#40BCD8","#1978B3")) 
+```
+
+```{r}
+grafi = df %>%
+  group_by(tipo_paciente, TOTAL_ERROS) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+grafi
+
+df %>% group_by(comorbidade_b, `TOTAL INCON`) %>% summarise(n = n())
+chisq.test(table(df$comorbidade_b, df$alarmes_inconsistente))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

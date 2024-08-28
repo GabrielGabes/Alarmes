@@ -1,0 +1,706 @@
+```{r}
+library(readxl)
+df <- read_excel("G:/Drives compartilhados/Qualidade/RESIDÊNCIA/Projetos científicos/Trabalho alarme/gabriel/ALARMES.xlsx", 
+    sheet = "Planilha1")
+View(df)
+```
+
+
+Tabela. 1 Parametrização individualizada necessária, de acordo com os sinais vitais pré-indução e comorbidades/condição clínica e parametrização realizada nos grupos controle e intervenção.
+```{r}
+df$tipo_paciente = factor(df$CAP, label = c("P1","P2"), levels = c(1,2))
+
+conti("PAR NECESSÁRIA", "tipo_paciente")
+conti("PAR REALIZADA", "tipo_paciente")
+
+df$tipo_paciente[df$tipo_paciente == "Controle"] = "P1"
+df$tipo_paciente[df$tipo_paciente == "Intervenção"] = "P2"
+```
+
+```{r}
+grafi = df %>% filter(!is.na(df$`PAR NECESSÁRIA`)) %>% 
+  group_by(tipo_paciente, `PAR NECESSÁRIA`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+grafi
+grafi$`PAR NECESSÁRIA` = ifelse(grafi$`PAR NECESSÁRIA` == "S", "Sim", "Não")
+
+ggplot(grafi, aes(as.factor(`PAR NECESSÁRIA`), Freq, label=Freq, fill=as.factor(`PAR NECESSÁRIA`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Parametrização individualizada Necessária",
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", retorne_p(chisq.test(df$tipo_paciente, df$`PAR NECESSÁRIA`)$p.value)))
+
+ggsave("Parametrização necessaria.png", height=15, width=20, units="cm", dpi= 600)
+###
+
+grafi = df %>% filter(!is.na(df$`PAR REALIZADA`)) %>% 
+  group_by(tipo_paciente, `PAR REALIZADA`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+grafi
+grafi$`PAR REALIZADA` = ifelse(grafi$`PAR REALIZADA` == "S", "Sim", "Não")
+
+ggplot(grafi, aes(as.factor(`PAR REALIZADA`), Freq, label=Freq, fill=as.factor(`PAR REALIZADA`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Parametrização individualizada Realizada ",
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", retorne_p(chisq.test(df$tipo_paciente, df$`PAR REALIZADA`)$p.value)))
+
+ggsave("Parametrização realizada.png", height=15, width=20, units="cm", dpi= 600)
+```
+Resultados
+```{r}
+#####
+for_tab = rbind(as.data.frame(cbind(df$`N SIS`, 'N SIS', 'Sistolica', df$tipo_paciente)),
+                as.data.frame(cbind(df$`N DIS`, 'N DIS', 'Diastólica', df$tipo_paciente)),
+                as.data.frame(cbind(df$`N SO`, 'N SO', 'Saturação \nO2%', df$tipo_paciente)),
+                as.data.frame(cbind(df$`N FC`, 'N FC', 'Frequência \ncardíaca', df$tipo_paciente))) %>% 
+  filter(V1 > 0)
+
+for_tab$V4 = factor(for_tab$V4, label = c("Controle","Intervenção"), levels = c(1,2))
+for_tab$V1 = as.numeric(for_tab$V1)
+
+ggplot(for_tab, aes(y=V1, x=V3, fill=V3)) + 
+  geom_dotplot(binaxis='y', stackdir='center') +
+  labs(y="Quantidade", x="", title='Alarmes Inconsistentes', fill="") + facet_grid(~V4) + 
+  theme_bw() + theme(legend.position = "bottom") +
+  scale_y_continuous(breaks=seq(from = min(for_tab$V1), to = max(for_tab$V1), by = 1))
+
+ggsave("Resultados_incons.png", height=15, width=20, units="cm", dpi= 600)
+
+#####
+for_tab = rbind(as.data.frame(cbind(df$`C SIS`, 'C SIS', 'Sistolica', df$tipo_paciente)),
+                as.data.frame(cbind(df$`C DIS`, 'C DIS', 'Diastólica', df$tipo_paciente)),
+                as.data.frame(cbind(df$`C SO`, 'C SO', 'Saturação \nO2%', df$tipo_paciente)),
+                as.data.frame(cbind(df$`C FC`, 'C FC', 'Frequência \ncardíaca', df$tipo_paciente))) %>% 
+  filter(V1 > 0)
+
+for_tab$V4 = factor(for_tab$V4, label = c("Controle","Intervenção"), levels = c(1,2))
+for_tab$V1 = as.numeric(for_tab$V1)
+
+ggplot(for_tab, aes(y=V1, x=V3, fill=V3)) + 
+  geom_dotplot(binaxis='y', stackdir='center') +
+  labs(y="Quantidade", x="", title="Alarmes Consistentes", fill="") + facet_grid(~V4) + 
+  theme_bw() + theme(legend.position = "bottom") +
+  scale_y_continuous(breaks=seq(from = min(for_tab$V1), to = max(for_tab$V1), by = 1)) 
+
+ggsave("Resultados_consis.png", height=15, width=20, units="cm", dpi= 600)
+```
+
+O paciente mais grafico necessita mais de parametrização ?
+```{r}
+grafi = df %>%
+  group_by(tipo_paciente, ASA) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+grafi
+
+ggplot(grafi, aes(as.factor(ASA), Freq, label=Freq, fill=as.factor(ASA))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="ASA",
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", retorne_p(chisq.test(df$tipo_paciente, df$ASA)$p.value))) + 
+  scale_fill_brewer()
+
+ggsave("ASA.png", height=15, width=20, units="cm", dpi= 600)
+```
+
+
+```{r}
+conti('TOTAL AL', 'tipo_paciente')
+
+tabela = df %>%
+  group_by(tipo_paciente, `TOTAL AL`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(`TOTAL AL`), Freq, label=Freq, fill=as.factor(`TOTAL AL`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade Falso Negativo",
+       subtitle = paste0("P-Valor (Qui-quadrado) = ", retorne_p(chisq.test(table(df$`TOTAL AL`, df$tipo_paciente))$p.value), 
+                         " ; (Mann-Whitney) = ", retorne_p(wilcox.test(`TOTAL AL`~tipo_paciente, data=df)$p.value))) +
+  scale_fill_brewer(palette = "Reds")
+
+ggsave("TOTAL AL 1.png", height=20, width=15, units="cm", dpi= 600)
+
+#quantos tiveram um falso negativo no controle e intervenção ?
+df$houve_falso_negativo = ifelse(df$`TOTAL AL` == 0, '0', '≥ 1')
+conti('houve_falso_negativo', 'tipo_paciente')
+df$houve_falso_negativo = as.factor(df$houve_falso_negativo)
+df$houve_falso_negativo <- factor(df$houve_falso_negativo, levels = c('0', '≥ 1'))
+conti('houve_falso_negativo', 'tipo_paciente')
+
+#houve diferença entre essas proporções de casos de falso negativo ?
+prop.test(table(df$houve_falso_negativo, df$tipo_paciente))
+prop.test(table(df$houve_falso_negativo, df$tipo_paciente), alternative = "less")
+
+tabela = df %>%
+  group_by(tipo_paciente, houve_falso_negativo) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(houve_falso_negativo), Freq, label=Freq, fill=as.factor(houve_falso_negativo))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade Falso Negativo",
+       subtitle = paste0("P-Valor (Teste z) = ", retorne_p(prop.test(table(df$houve_falso_negativo, df$tipo_paciente))$p.value), 
+                         " ; (Teste Z unilateral a esquerda) = ", 
+                         retorne_p(prop.test(table(df$houve_falso_negativo, df$tipo_paciente), alternative = "less")$p.value))) +
+  scale_fill_brewer(palette = "Reds")
+
+ggsave("TOTAL AL 2.png", height=15, width=20, units="cm", dpi= 600)
+```
+```{r}
+table(df$`TOTAL INCON`, df$tipo_paciente)
+
+tabela = df %>%
+  group_by(tipo_paciente, `TOTAL INCON`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(`TOTAL INCON`), Freq, label=Freq, fill=as.factor(`TOTAL INCON`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade Falso Positívo",
+       subtitle = paste0("P-Valor (Qui-quadrado) = ", retorne_p(chisq.test(table(df$`TOTAL INCON`, df$tipo_paciente))$p.value), 
+                         " ; (Mann-Whitney) = ", retorne_p(wilcox.test(`TOTAL INCON`~tipo_paciente, data=df)$p.value))) +
+  scale_fill_brewer(palette = "Greens")
+
+ggsave("TOTAL INCON.png", height=15, width=20, units="cm", dpi= 600)
+
+#quantos tiveram um falso positivo no controle e intervenção ?
+df$houve_falso_positivo = ifelse(df$`TOTAL INCON` == 0, '0', '≥ 1')
+conti('houve_falso_positivo', 'tipo_paciente')
+df$houve_falso_positivo = as.factor(df$houve_falso_positivo)
+df$houve_falso_positivo <- factor(df$houve_falso_positivo, levels = c('0', '≥ 1'))
+conti('houve_falso_positivo', 'tipo_paciente')
+
+#houve diferença entre essas proporções de casos de falso positivo ?
+prop.test(table(df$houve_falso_positivo, df$tipo_paciente))
+prop.test(table(df$houve_falso_positivo, df$tipo_paciente), alternative = "less")
+
+tabela = df %>%
+  group_by(tipo_paciente, houve_falso_positivo) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(houve_falso_positivo), Freq, label=Freq, fill=as.factor(houve_falso_positivo))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade Falso Positívo",
+       subtitle = paste0("P-Valor (Teste z) = ", retorne_p(prop.test(table(df$houve_falso_positivo, df$tipo_paciente))$p.value), 
+                         " ; (Teste Z unilateral a esquerda) = ", 
+                         retorne_p(prop.test(table(df$houve_falso_positivo, df$tipo_paciente), alternative = "less")$p.value))) +
+  scale_fill_brewer(palette = "Greens")
+
+ggsave("TOTAL INCON 2.png", height=15, width=20, units="cm", dpi= 600)
+```
+
+```{r}
+conti('TOTAL CONS', 'tipo_paciente')
+
+tabela = df %>%
+  group_by(tipo_paciente, `TOTAL CONS`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(`TOTAL CONS`), Freq, label=Freq, fill=as.factor(`TOTAL CONS`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade Verdadeiro Positívo",
+       subtitle = paste0("P-Valor (Qui-quadrado) = ", retorne_p(chisq.test(table(df$`TOTAL CONS`, df$tipo_paciente))$p.value), 
+                         " ; (Mann-Whitney) = ", retorne_p(wilcox.test(`TOTAL CONS`~tipo_paciente, data=df)$p.value))) +
+  scale_fill_brewer(palette = "Blues")
+
+ggsave("TOTAL CONS.png", height=15, width=20, units="cm", dpi= 600)
+
+#quantos tiveram um verdadeiro positivo no controle e intervenção ?
+df$houve_verdadeiro_positivo = ifelse(df$`TOTAL CONS` == 0, '0', '≥ 1')
+df$houve_verdadeiro_positivo = as.factor(df$houve_verdadeiro_positivo)
+df$houve_verdadeiro_positivo = factor(df$houve_verdadeiro_positivo, levels = c('0', '≥ 1'))
+conti('houve_verdadeiro_positivo', 'tipo_paciente')
+
+#houve diferença entre as proporções de verdadeiro positivo ?
+prop.test(table(df$houve_verdadeiro_positivo, df$tipo_paciente))
+prop.test(table(df$houve_verdadeiro_positivo, df$tipo_paciente), alternative = "less")
+
+tabela = df %>%
+  group_by(tipo_paciente, houve_verdadeiro_positivo) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(houve_verdadeiro_positivo), Freq, label=Freq, fill=as.factor(houve_verdadeiro_positivo))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade Verdadeiro Positívo",
+       subtitle = paste0("P-Valor (Teste z) = ", retorne_p(prop.test(table(df$houve_verdadeiro_positivo, df$tipo_paciente))$p.value), 
+                         " ; (Teste Z unilateral a esquerda) = ", 
+                         retorne_p(prop.test(table(df$houve_verdadeiro_positivo, df$tipo_paciente), alternative = "less")$p.value))) +
+  scale_fill_brewer(palette = "Blues")
+
+ggsave("TOTAL CONS 2.png", height=15, width=20, units="cm", dpi= 600)
+```
+Destes falsos positivos e negativos, qual era o numero de alarmes que suou ?
+```{r}
+df$TOTAL_ERROS = df$`TOTAL AL` + df$`TOTAL INCON` #Juntando falsos negativos com falsos negativos
+
+df_filter = df %>% filter(TOTAL_ERROS > 0)
+
+grafi = df_filter %>% 
+  group_by(tipo_paciente, TOTAL_ERROS) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+grafi
+
+df_filter %>% tabyl(TOTAL_ERROS, tipo_paciente, show_na = FALSE) %>% 
+  adorn_totals(c("row", "col")) %>% adorn_percentages("col") %>% 
+  adorn_pct_formatting(2) %>% adorn_ns %>% print() %>% 
+  write_clip(dec = ",", col.names = TRUE)
+
+ggplot(grafi, aes(as.factor(TOTAL_ERROS), Freq, label=Freq, fill=as.factor(TOTAL_ERROS))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidades de sinais falsos",
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", retorne_p(chisq.test(df_filter$tipo_paciente, df_filter$TOTAL_ERROS)$p.value),
+                         " ; (Mann-Whitney) = ", retorne_p(wilcox.test(TOTAL_ERROS~tipo_paciente, data=df_filter)$p.value))) +
+  scale_fill_brewer(palette = "Oranges")
+
+ggsave("TOTAL ERROS 1.png", height=15, width=20, units="cm", dpi= 600)
+
+#### De todos
+grafi = df %>%
+  group_by(tipo_paciente, TOTAL_ERROS) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+grafi
+
+df %>% tabyl(TOTAL_ERROS, tipo_paciente, show_na = FALSE) %>% 
+  adorn_totals(c("row", "col")) %>% adorn_percentages("col") %>% 
+  adorn_pct_formatting(2) %>% adorn_ns %>% print() %>% 
+  write_clip(dec = ",", col.names = TRUE)
+
+ggplot(grafi, aes(as.factor(TOTAL_ERROS), Freq, label=Freq, fill=as.factor(TOTAL_ERROS))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidades de sinais falsos",
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", retorne_p(chisq.test(df$tipo_paciente, df$TOTAL_ERROS)$p.value),
+                         " ; (Man-Whitney) = ", retorne_p(wilcox.test(TOTAL_ERROS~tipo_paciente, data=df)$p.value))) +
+  scale_fill_brewer(palette = "Oranges")
+
+ggsave("TOTAL ERROS 2.png", height=15, width=20, units="cm", dpi= 600)
+
+#quantos tiveram um verdadeiro positivo no controle e intervenção ?
+df$houve_erros = ifelse(df$TOTAL_ERROS == 0, '0', '≥ 1')
+df$houve_erros = as.factor(df$houve_erros)
+df$houve_erros = factor(df$houve_erros, levels = c('0', '≥ 1'))
+
+#houve diferença entre as proporções de verdadeiro positivo ?
+prop.test(table(df$houve_erros, df$tipo_paciente))
+prop.test(table(df$houve_erros, df$tipo_paciente), alternative = "less")
+
+tabela = df %>%
+  group_by(tipo_paciente, houve_erros) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+ggplot(tabela, aes(as.factor(houve_erros), Freq, label=Freq, fill=as.factor(houve_erros))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(~tipo_paciente) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="Quantidade de Alarmes errados",
+       subtitle = paste0("P-Valor (Teste z) = ", retorne_p(prop.test(table(df$houve_erros, df$tipo_paciente))$p.value), 
+                         " ; (Teste Z unilateral a direita) = ", 
+                         retorne_p(prop.test(table(df$houve_erros, df$tipo_paciente), alternative = "less")$p.value))) +
+  scale_fill_brewer(palette = "Oranges")
+
+ggsave("TOTAL ERROS 3.png", height=15, width=20, units="cm", dpi= 600)
+```
+Havia mais condutas consistentes ou inconsistente com o alarme ja parametrizado ?
+```{r}
+#separacao = df[c('tipo_paciente','CONDUTA CONSISTENTE','CONDUTA INCONSISTENTE')]
+#capture(separacao)
+
+for (i in c("CONDUTA CONSISTENTE","CONDUTA INCONSISTENTE")){
+  for (t in 1:length(para_grafico$tipo_paciente)){
+    if (para_grafico[[i]][t] == 1){
+      para_grafico[[i]][t] = "1. Parametrização"
+    }
+    if (para_grafico[[i]][t] == 2){
+      para_grafico[[i]][t] = "2. Pausar Alarme"
+    }
+    if (para_grafico[[i]][t] == 3){
+      para_grafico[[i]][t] = "3. Convocar Médico"
+    }
+    if (para_grafico[[i]][t] == 4){
+      para_grafico[[i]][t] = "4. Conduta Médico"
+    }
+    if (para_grafico[[i]][t] == 5){
+      para_grafico[[i]][t] = "5. Alarmes soando \nsem ação"
+    }
+    if (para_grafico[[i]][t] == 6){
+      para_grafico[[i]][t] = "6. Desconexão de \ndispositivo"
+    }
+  }
+}
+
+para_grafico
+
+#####
+tabela = para_grafico %>% filter(`CONDUTA CONSISTENTE` > 0) %>% 
+  group_by(tipo_paciente, `CONDUTA CONSISTENTE`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+tabela
+
+para_grafico %>% tabyl(`CONDUTA CONSISTENTE`, tipo_paciente, show_na = FALSE) %>% 
+  adorn_totals(c("row", "col")) %>% adorn_percentages("col") %>% 
+  adorn_pct_formatting(2) %>% adorn_ns %>% print() %>% 
+  write_clip(dec = ",", col.names = TRUE)
+
+para_grafico_filter = para_grafico %>% filter(`CONDUTA CONSISTENTE` > 0)
+ggplot(tabela, aes(as.factor(`CONDUTA CONSISTENTE`), Freq, label=Freq, fill=as.factor(`CONDUTA CONSISTENTE`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="", title ='Tipo de ação diante de alarmes consistentes',
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", 
+                         retorne_p(chisq.test(para_grafico_filter$tipo_paciente, para_grafico_filter$`CONDUTA CONSISTENTE`)$p.value))) +
+  scale_fill_brewer(palette = "Paired")
+
+ggsave("acao_consistencia.png", height=15, width=20, units="cm", dpi= 600)
+
+#####
+tabela = para_grafico %>% filter(`CONDUTA INCONSISTENTE` > 0) %>% 
+  group_by(tipo_paciente, `CONDUTA INCONSISTENTE`) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+tabela
+
+para_grafico %>% tabyl(`CONDUTA INCONSISTENTE`, tipo_paciente, show_na = FALSE) %>% 
+  adorn_totals(c("row", "col")) %>% adorn_percentages("col") %>% 
+  adorn_pct_formatting(2) %>% adorn_ns %>% print() %>% 
+  write_clip(dec = ",", col.names = TRUE)
+
+para_grafico_filter = para_grafico %>% filter(`CONDUTA INCONSISTENTE` > 0)
+ggplot(tabela, aes(as.factor(`CONDUTA INCONSISTENTE`), Freq, label=Freq, fill=as.factor(`CONDUTA INCONSISTENTE`))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="", title = 'Tipo de ação diante de alarmes inconsistentes',
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", 
+                         retorne_p(chisq.test(para_grafico_filter$tipo_paciente, para_grafico_filter$`CONDUTA INCONSISTENTE`)$p.value))) +
+  scale_fill_brewer(palette = "Set1")
+
+ggsave("acao_inconsistencia.png", height=15, width=20, units="cm", dpi= 600)
+```
+```{r}
+separacao = df[c('tipo_paciente','COMORBIDADE')]
+capture(separacao)
+
+for (i in c("COMORBIDADE")){
+  for (t in 1:length(para_grafico$tipo_paciente)){
+    if (para_grafico[[i]][t] == 1){
+      para_grafico[[i]][t] = "1. DPOC"
+    }
+    if (para_grafico[[i]][t] == 2){
+      para_grafico[[i]][t] = "2. Tabagismo"
+    }
+    if (para_grafico[[i]][t] == 3){
+      para_grafico[[i]][t] = "3. HAS"
+    }
+    if (para_grafico[[i]][t] == 4){
+      para_grafico[[i]][t] = "4. Bradicardia \nFisiológica"
+    }
+    if (para_grafico[[i]][t] == 5){
+      para_grafico[[i]][t] = "5. Arritimias"
+    }
+    if (para_grafico[[i]][t] == 6){
+      para_grafico[[i]][t] = "6. DM"
+    }
+    if (para_grafico[[i]][t] == 7){
+      para_grafico[[i]][t] = "7. Outras"
+    }    
+  }
+}
+
+para_grafico
+
+#####
+tabela = para_grafico %>% filter(COMORBIDADE > 0) %>% 
+  group_by(tipo_paciente, COMORBIDADE) %>% 
+  summarise(n = n()) %>% mutate(Freq = round(n/sum(n), 4)) %>% ungroup()
+tabela
+
+para_grafico %>% tabyl(COMORBIDADE, tipo_paciente, show_na = FALSE) %>% 
+  adorn_totals(c("row", "col")) %>% adorn_percentages("col") %>% 
+  adorn_pct_formatting(2) %>% adorn_ns %>% print() %>% 
+  write_clip(dec = ",", col.names = TRUE)
+
+para_grafico_filter = para_grafico %>% filter(COMORBIDADE > 0)
+ggplot(tabela, aes(as.factor(COMORBIDADE), Freq, label=Freq, fill=as.factor(COMORBIDADE))) + 
+  geom_col(show.legend = FALSE, color="black") + facet_grid(tipo_paciente~.) +
+  geom_text(aes(y=Freq, label = scales::percent(Freq), vjust=-0.1)) + scale_y_continuous(labels = scales::percent) +
+  theme_bw() + theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic')) +
+  scale_y_continuous(limits = c(0, 1), breaks=seq(from = 0, to = 1, by = 0.25)) +
+  labs(x="", title ='Distribuição de comorbidades',
+       subtitle = paste0("P-Valor (Qui-Quadrado) = ", 
+                         retorne_p(chisq.test(para_grafico_filter$tipo_paciente, para_grafico_filter$COMORBIDADE)$p.value))) +
+  scale_fill_brewer(palette = "Spectral")
+
+ggsave("comorbidades.png", height=15, width=20, units="cm", dpi= 600)
+```
+```{r}
+tabela = df %>% group_by(tipo_paciente, TURNO) %>% 
+  summarise(soma = sum(`TOTAL CONS`))
+
+medianas = tabela %>% group_by(tipo_paciente) %>% summarize(med = median(soma))
+
+ggplot(tabela %>% filter(tipo_paciente == "Controle"), aes(x=TURNO, y=soma)) + 
+  geom_line(size=1) +
+  geom_point(size=4, color="blue") + 
+  geom_hline(yintercept = medianas$med[1], linetype="dashed", size=1, color="red") + 
+  scale_y_continuous(limits = c(0, 25), breaks=seq(from = 0, to = 26, by = 2)) +
+  scale_x_continuous(breaks=seq(from = 0, to = 13, by = 2)) +
+  theme_bw() +
+  labs(title="Controle", y="Número de alarmes consistentes", x="Turnos") +
+  geom_text(label= paste0("Mediana = ", medianas$med[1]), y = medianas$med[1]+1, x=8.9) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("cchart_1.png", height=15, width=20, units="cm", dpi= 600)
+
+ggplot(tabela %>% filter(tipo_paciente == "Intervenção"), aes(x=TURNO, y=soma)) + 
+  geom_line(size=1) +
+  geom_point(size=4, color="blue") + 
+  geom_hline(yintercept = medianas$med[2], linetype="dashed", size=1, color="red") + 
+  scale_y_continuous(limits = c(0, 25), breaks=seq(from = 0, to = 26, by = 2)) +
+  scale_x_continuous(breaks=seq(from = 14, to = 26, by = 2)) +
+  theme_bw() +
+  labs(title="Intervenção", y="Número de alarmes consistentes", x="Turnos") +
+  geom_text(label= paste0("Mediana = ", medianas$med[2]), y = medianas$med[2]+1, x=21.5) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("cchart_2.png", height=15, width=20, units="cm", dpi= 600)
+```
+```{r}
+df
+```
+
+```{r}
+df[c("tipo_paciente","TURNO","TOTAL AL","TOTAL CONS")]
+
+tabela1 = df[c('TURNO',"TOTAL AL")]
+tabela1$tipo = "Alarme Inconsistentes"
+colnames(tabela1)[2] = "Quantidade"
+
+tabela2 = df[c('TURNO',"TOTAL CONS")]
+tabela2$tipo = "Alarme consistentes"
+colnames(tabela2)[2] = "Quantidade"
+
+tabela = rbind(tabela1, tabela2)
+
+ggplot(tabela %>% filter(Quantidade > 0), aes(x=as.factor(TURNO), y=Quantidade, fill=tipo)) + geom_boxplot() +
+  theme_bw() + theme(legend.position = "bottom") + 
+  labs(x="Turno", y="", fill="")
+
+ggsave("boxplots.png", height=15, width=20, units="cm", dpi= 600)
+```
+
+
+
+Há uma melhoria com intervenção em relação ao numero de alarmes consistentes ?
+```{r}
+
+
+Fadiga = df %>% filter(!is.na(df$tipo_paciente)) %>% 
+  group_by(tipo_paciente, TOTAL_ERROS) %>% 
+  summarise(n = n())
+
+Fadiga$tipo = "Fadiga"
+colnames(Fadiga)[2] = "Total"
+Fadiga
+
+
+Consistencia = df %>% filter(!is.na(df$tipo_paciente)) %>% 
+  group_by(tipo_paciente, `TOTAL CONS`) %>% 
+  summarise(n = n())
+
+Consistencia$tipo = "Consistencia"
+colnames(Consistencia)[2] = "Total"
+Consistencia
+
+agrupamento = rbind(Fadiga, Consistencia)
+agrupamento
+  
+#####
+agrupamento$Total = as.numeric(agrupamento$Total)
+agrupamento = agrupamento %>% filter(Total > 0)
+
+ggplot(agrupamento, aes(x=as.factor(Total), y=n, fill=tipo)) + geom_boxplot()
+
+```
+
+
+```{r}
+Fadiga = df[c('TOTAL_ERROS','tipo_paciente')]
+Fadiga$tipo = "Alarmes inconsistentes"
+Fadiga
+
+Consistencia = df[c('TOTAL CONS','tipo_paciente')]
+Consistencia$tipo = "Alarmes consistentes"
+Consistencia
+
+colnames(Fadiga)[1] = "Total"
+colnames(Consistencia)[1] = "Total"
+
+agrupamento = rbind(Fadiga, Consistencia)
+  
+#####
+agrupamento$Total = as.numeric(agrupamento$Total)
+agrupamento = agrupamento %>% filter(Total > 0)
+
+ggplot(agrupamento, aes(y=as.factor(Total), fill=tipo)) + geom_boxplot()
+
+
+
+
+```
+
+
+
+###
+```{r}
+ggplot(df %>% filter(`TOTAL INCON`> 0), aes(x=as.factor(CAP), y=`TOTAL INCON`, fill=as.factor(CAP))) + 
+    geom_jitter(alpha=0.5, show.legend = F, size=2.5, position=position_jitter(0.25)) +
+    geom_boxplot(alpha=0.9, show.legend = F) + 
+    labs(y='Inconsistent Alarms (n)', x="") + 
+    theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+          legend.position = "bottom",axis.line = element_line(colour = "black")) +
+    theme_bw() +
+    scale_x_discrete(labels = c("P1","P2")) + 
+    scale_y_continuous(breaks=seq(from = 1, to = max(df$`TOTAL INCON`), by = 1)) +
+  scale_fill_manual(values=c("#023e8a","#8d99ae"))
+
+
+ggsave("Boxplot alarmes inconscistente.png", height=15, width=12, units="cm", dpi= 600)
+
+####
+
+ggplot(df %>% filter(`TOTAL CONS`> 0), aes(x=as.factor(CAP), y=`TOTAL CONS`, fill=as.factor(CAP))) + 
+    geom_jitter(alpha=0.5, show.legend = F, size=2.5, position=position_jitter(0.25)) +
+    geom_boxplot(alpha=0.9, show.legend = F) + 
+    labs(y='Consistent Alarms (n)', x="") + 
+    theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+          legend.position = "bottom",axis.line = element_line(colour = "black")) +
+    theme_bw() +
+    scale_x_discrete(labels = c("P1","P2")) + 
+    scale_y_continuous(breaks=seq(from = 1, to = max(df$`TOTAL CONS`), by = 1)) +
+  scale_fill_manual(values=c("#023e8a","#8d99ae"))
+
+
+ggsave("Boxplot alarmes conscientes.png", height=15, width=12, units="cm", dpi= 600)
+```
+```{r}
+ggplot() + 
+  geom_point(data = df %>% filter(`C SIS` > 0), aes(y=`C SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C SIS` > 0), aes(y=`C SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.9) +
+  geom_point(data = df %>% filter(`C DIS` > 0), aes(y=`C DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C DIS` > 0), aes(y=`C DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`C SO` > 0), aes(y=`C SO`, x="SP02", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C SO` > 0), aes(y=`C SO`, x="SP02", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`C FC` > 0), aes(y=`C FC`, x="HR", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`C FC` > 0), aes(y=`C FC`, x="HR", fill=as.factor(CAP)), alpha=0.9, show.legend = F) + 
+  scale_y_continuous(breaks=seq(from = 1, to = 12, by = 1)) + labs(y='Consistent Alarms (n)', x="", fill="") + 
+  theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+        legend.position = "bottom", axis.line = element_line(colour = "black")) + scale_fill_manual(values=c("#023e8a","#8d99ae"), labels = c("P1","P2")) +
+  theme_bw() + theme(legend.position="bottom")
+  
+#geom_boxjitter
+  
+ggsave("Consistent alarmes.png", height=10, width=20, units="cm", dpi= 600)
+
+####
+
+ggplot() + 
+  geom_point(data = df %>% filter(`N SIS` > 0), aes(y=`N SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N SIS` > 0), aes(y=`N SIS`, x="S-NIBP", fill=as.factor(CAP)), alpha=0.9) +
+  geom_point(data = df %>% filter(`N DIS` > 0), aes(y=`N DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N DIS` > 0), aes(y=`N DIS`, x="D-NIBP", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`N SO` > 0), aes(y=`N SO`, x="SP02", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N SO` > 0), aes(y=`N SO`, x="SP02", fill=as.factor(CAP)), alpha=0.9, show.legend = F) +
+  geom_point(data = df %>% filter(`N FC` > 0), aes(y=`N FC`, x="HR", fill=as.factor(CAP)), alpha=0.5, show.legend = F, size=2.5, position=position_jitterdodge()) +
+  geom_boxplot(data = df %>% filter(`N FC` > 0), aes(y=`N FC`, x="HR", fill=as.factor(CAP)), alpha=0.9, show.legend = F) + 
+  scale_y_continuous(breaks=seq(from = 1, to = 12, by = 1)) + labs(y='Inconsistent Alarms (n)', x="", fill="") + 
+  theme(plot.title=element_text(face='italic'), axis.title=element_text(size=9, face='italic'), 
+        legend.position = "bottom",axis.line = element_line(colour = "black")) + scale_fill_manual(values=c("#023e8a","#8d99ae"), labels = c("P1","P2")) +
+  theme_bw() + theme(legend.position="bottom")
+  
+
+ggsave("Inconsistent alarmes.png", height=10, width=20, units="cm", dpi= 600)
+```
+
+
+```{r}
+tabela = df %>%
+  group_by(TURNO, CAP) %>%
+  summarize(mean = mean(`TOTAL CONS`))
+
+ggplot(tabela, aes(x=as.factor(TURNO), y=`mean`, color = as.factor(CAP))) + geom_point() + geom_line()
+
+ggplot(df %>% filter(`TOTAL AL` > 0), aes(x=as.factor(TURNO), y=`TOTAL CONS`)) + geom_point()
+```
+```{r}
+tabela = df %>% group_by(tipo_paciente, TURNO) %>% 
+  summarise(soma = sum(`TOTAL INCON`))
+
+tabela
+
+medianas = tabela %>% group_by(tipo_paciente) %>% summarize(med = median(soma))
+
+ggplot(tabela %>% filter(tipo_paciente == "Controle"), aes(x=TURNO, y=soma)) + 
+  geom_line(size=1) +
+  geom_point(size=4, color="blue") + 
+  geom_hline(yintercept = medianas$med[1], linetype="dashed", size=1, color="red") + 
+  scale_y_continuous(limits = c(0, 28), breaks=seq(from = 0, to = 28, by = 2)) +
+  scale_x_continuous(breaks=seq(from = 0, to = 13, by = 2)) +
+  theme_bw() +
+  labs(title="Controle", y="Número de alarmes inconsistentes", x="Turnos") +
+  geom_text(label= paste0("Mediana = ", medianas$med[1]), y = medianas$med[1]+1, x=8.9) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("cchart_inc_1.png", height=15, width=20, units="cm", dpi= 600)
+
+ggplot(tabela %>% filter(tipo_paciente == "Intervenção"), aes(x=TURNO, y=soma)) + 
+  geom_line(size=1) +
+  geom_point(size=4, color="blue") + 
+  geom_hline(yintercept = medianas$med[2], linetype="dashed", size=1, color="red") + 
+  scale_y_continuous(limits = c(0, 28), breaks=seq(from = 0, to = 28, by = 2)) +
+  scale_x_continuous(breaks=seq(from = 14, to = 26, by = 2)) +
+  theme_bw() +
+  labs(title="Intervenção", y="Número de alarmes inconsistentes", x="Turnos") +
+  geom_text(label= paste0("Mediana = ", medianas$med[2]), y = medianas$med[2]+1, x=21.5) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggsave("cchart_inc_2.png", height=15, width=20, units="cm", dpi= 600)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
