@@ -28,4 +28,4 @@ Customizing alarm settings based on individual patient data effectively reduces 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ### Contact
-For more information, please contact [gabriel_s_anjos@yahoo.com][(https://www.linkedin.com/feed/)].
+For more information, please contact [gabriel_s_anjos@yahoo.com][(https://www.linkedin.com/in/gabriel-silva-dos-anjos-gabes/)].
